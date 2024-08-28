@@ -130,6 +130,7 @@ ENV/
 env.bak/
 venv.bak/
 lpp/
+lpp/d.iypnb
 
 # Spyder project settings
 .spyderproject

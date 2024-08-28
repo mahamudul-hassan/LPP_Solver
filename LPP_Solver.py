@@ -6,7 +6,7 @@ st.set_page_config(page_title="LPP Solver", page_icon="assets/optimization.ico",
 
 # Page Title
 st.title("LPP Solver Web-App")
-st.write("This web application can solve linear programming problem including LP, IP(Integer Programming), MIP (Mixed Integer Programming).")
+st.write("This web application can solve linear programming problems including LP, IP (Integer Programming), MIP (Mixed Integer Programming).")
 
 # Inputs for objective function, number of variables, and number of constraints
 objective_function = st.text_input("Objective Function", placeholder="Enter the objective function here (e.g., 3x1 + 2x2)")
@@ -78,60 +78,57 @@ display_variable_type_inputs()
 # Display constraint inputs
 display_constraint_inputs()
 
-def parse_linear_expression(expr, num_vars):
-    # Parse a linear expression into coefficients for each variable
-    coefficients = [0] * num_vars
-    temp_sign = "+"
-    i = 0
-    expr = expr.replace(" ", "")  # Remove spaces
-    
-    while i < len(expr):
-        if expr[i] in "+-":
-            temp_sign = expr[i]
-            i += 1
-            continue
-        
-        coefficient = ""
-        while i < len(expr) and (expr[i].isdigit() or expr[i] == "."):
-            coefficient += expr[i]
-            i += 1
-        
-        if coefficient == "":
-            coefficient = "1"
-        elif coefficient == "-":
-            coefficient = "-1"
-        
-        if i < len(expr) and expr[i] == 'x':
-            i += 1
-            var_number = ""
-            while i < len(expr) and expr[i].isdigit():
-                var_number += expr[i]
-                i += 1
-            
-            if var_number == "":
-                st.error(f"Variable number missing in expression: {expr}")
-                continue
-            
-            coefficient = float(coefficient)
-            num_var = int(var_number)
-            
-            if temp_sign == "-":
-                coefficient = -coefficient
+def parse_objective_function(Z, num_vars):
+    Z = Z.lower().replace(" ", "")
+    objective_function_coefficients = [0] * num_vars
 
-            if 1 <= num_var <= num_vars:
-                coefficients[num_var - 1] += coefficient
-            else:
-                st.error(f"Variable number {num_var} is out of range.")
-                continue
-        else:
-            st.error(f"Invalid format in expression: {expr}")
-            continue
-    
-    return coefficients
+    # Normalize signs and split the terms
+    Z = Z.replace("-", "+-")
+    Z_list = Z.split("+")
+
+    for term in Z_list:
+        if 'x' in term:
+            coeff, var_no = term.split("x")
+            coeff = float(coeff) if coeff not in ['', '-'] else float(f"{coeff}1")
+            var_no = int(var_no.strip())
+            objective_function_coefficients[var_no - 1] = coeff
+
+    return objective_function_coefficients
+
+def parse_constraint(Z, num_vars):
+    Z = Z.lower().replace(" ", "")
+    constraint_coefficients = [0] * num_vars
+    inequality_sign = None
+    rhs_value = None
+
+    # Identify and split the inequality sign
+    if "<=" in Z:
+        inequality_sign = "<="
+    elif ">=" in Z:
+        inequality_sign = ">="
+    else:
+        inequality_sign = "="
+    left_side, right_side = Z.split(inequality_sign)
+
+    # Extract RHS value
+    rhs_value = float(right_side)
+
+    # Process the LHS similar to the objective function
+    left_side = left_side.replace("-", "+-")
+    Z_list = left_side.split("+")
+
+    for term in Z_list:
+        if 'x' in term:
+            coeff, var_no = term.split("x")
+            coeff = float(coeff) if coeff not in ['', '-'] else float(f"{coeff}1")
+            var_no = int(var_no.strip())
+            constraint_coefficients[var_no - 1] = coeff
+
+    return constraint_coefficients, inequality_sign, rhs_value
 
 # Button to submit objective function
 if st.button("Submit Objective Function") and objective_function:
-    st.session_state.objective_coeffs = parse_linear_expression(objective_function, num_vars)
+    st.session_state.objective_coeffs = parse_objective_function(objective_function, num_vars)
     st.session_state.displayed_objective_function = objective_function
 
 # Process constraints
@@ -143,25 +140,8 @@ if st.button("Submit Constraints"):
     for raw_constraint in st.session_state.constraints:
         if not raw_constraint.strip():
             continue
-        
-        # Identify inequality sign and right-hand side value
-        inequality_sign = None
-        rhs_value = None
-        
-        for sign in ["<=", ">=", "="]:
-            if sign in raw_constraint:
-                parts = raw_constraint.split(sign)
-                if len(parts) == 2:
-                    inequality_sign = sign
-                    rhs_value = float(parts[1].strip())
-                    raw_constraint = parts[0].strip()  # Left-hand side expression
-                break
-        
-        if inequality_sign is None or rhs_value is None:
-            st.error(f"Inequality sign or RHS value missing in constraint: {raw_constraint}")
-            continue
 
-        constraint_coeffs = parse_linear_expression(raw_constraint, num_vars)
+        constraint_coeffs, inequality_sign, rhs_value = parse_constraint(raw_constraint, num_vars)
         st.session_state.clean_constraints.append(constraint_coeffs)
         st.session_state.inequality_signs.append(inequality_sign)
         st.session_state.rhs_values.append(rhs_value)
@@ -209,7 +189,7 @@ if st.button("Solve Problem") and st.session_state.objective_coeffs:
         elif st.session_state.inequality_signs[i] == "=":
             linear_program += (constraint_expr == st.session_state.rhs_values[i])
 
-    # Solve the linear program
+    # Solve the linear program'
     linear_program.solve()
 
     # Display the results
